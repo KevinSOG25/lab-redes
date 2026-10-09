@@ -15,8 +15,9 @@ int main(int argc, char **argv){
 
     setbuf(stdout, NULL);
 
-    if(argc != 4){
-        fprintf(stderr, "Usage: %s <my_port> <broker_ip> <broker_port>\n", argv[0]);
+    // se puede suscribir a uno o mas temas: ./subscriber 6001 broker 5000 deportes clima
+    if(argc < 5){
+        fprintf(stderr, "Usage: %s <my_port> <broker_ip> <broker_port> <topic> [topic2 ...]\n", argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -47,9 +48,19 @@ int main(int argc, char **argv){
         return EXIT_FAILURE;
     }
 
-    // sendto que en este este caso es para registrarse en el broker, de manera que cuando el broker reciba un mensaje de un publisher, sepa a donde enviarlo 
-    const char *sub_msg = "SUBSCRIBE";
-    check(sendto(udp_socket, sub_msg, strlen(sub_msg) + 1, 0,res->ai_addr, res->ai_addrlen),"Error enviando SUBSCRIBE");
+    // sendto que en este este caso es para registrarse en el broker, de manera que cuando el broker reciba un mensaje de un publisher
+    // en alguno de estos temas, sepa a donde enviarlo. Se envia un "SUBSCRIBE <tema>" por cada tema indicado
+    for(int i = 4; i < argc; i++){
+        const char *topic = argv[i];
+        if(topic[0] == '\0' || strchr(topic, ' ') != NULL){
+            fprintf(stderr, "Tema invalido '%s' (no puede estar vacio ni tener espacios), se omite\n", topic);
+            continue;
+        }
+        char sub_msg[BUFFER_SIZE];
+        int len = snprintf(sub_msg, sizeof(sub_msg), "SUBSCRIBE %s", topic);
+        check(sendto(udp_socket, sub_msg, len + 1, 0, res->ai_addr, res->ai_addrlen), "Error enviando SUBSCRIBE");
+        printf("[SUBSCRIBER] Suscrito al tema '%s'\n", topic);
+    }
     // freeaddrinfo libera la memoria que reservo getaddrinfo ya que no la necesitamos mas despues de enviar el subscribe
     freeaddrinfo(res);
 
